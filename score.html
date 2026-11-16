@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Partitura Promenade</title>
+<style>
+body{margin:0;padding:12px;font-family:Arial,sans-serif;background:#fff;color:#253047}
+#status{color:#6d7787;font-size:14px;margin:4px 0 12px}
+#score{width:100%;overflow:auto}
+button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff;font-weight:bold;cursor:pointer}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.2/build/opensheetmusicdisplay.min.js"></script>
+</head>
+<body>
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<button id="reload">↻ Recargar partitura</button><span id="status">Preparando partitura...</span>
+</div>
+<div id="score">Cargando...</div>
+<script>
+(async()=>{
+ const status=document.getElementById('status');
+ const target=document.getElementById('score');
+ async function render(){
+  status.textContent='Cargando la partitura original...';
+  try{
+   const lib=window.opensheetmusicdisplay;
+   if(!lib||!lib.OpenSheetMusicDisplay)throw new Error('No se ha cargado el visor musical. Comprueba la conexión.');
+   const response=await fetch('./assets/promenade.musicxml',{cache:'no-store'});
+   if(!response.ok)throw new Error('No se encuentra el archivo MusicXML ('+response.status+').');
+   const musicxml=await response.text();
+   const osmd=new lib.OpenSheetMusicDisplay(target,{autoResize:true,backend:'svg',drawTitle:true,drawPartNames:true,followCursor:false});
+   await osmd.load(musicxml);
+   osmd.render();
+   status.textContent='Partitura de Promenade cargada correctamente · 2 voces';
+  }catch(err){status.textContent='Error: '+err.message;target.textContent='No se pudo mostrar la partitura.';console.error(err)}
+ }
+ document.getElementById('reload').addEventListener('click',render);
+ await render();
+})();
+</script>
+</body>
+</html>
