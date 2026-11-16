@@ -17,11 +17,29 @@
 <button id="pausePromenade">⏸ Pausar</button>
 <button id="stopPromenade">⏹ Detener</button>
 </div>
+<div style="margin-top:22px;padding:16px;background:#f8f6fd;border:1px solid #e7e3f2;border-radius:14px">
+<h2 style="margin:0 0 8px;color:#6b4fc8">🎼 Partitura de Promenade</h2>
+<p class="muted" style="font-size:14px">Abre la partitura original en un visor independiente. Este visor no interviene en el inicio de sesión ni en el reproductor.</p>
+<button type="button" id="toggleScore" class="primary">👁 Mostrar partitura</button>
+<div id="scoreFrameBox" class="hidden" style="margin-top:14px">
+<iframe id="scoreFrame" title="Partitura original de Promenade" loading="lazy" style="width:100%;height:650px;border:1px solid #e7e3f2;border-radius:10px;background:white" src="about:blank"></iframe>
+</div></div>
 <div style="margin-top:20px;padding:16px;background:#f5f2fc;border-radius:14px"><b>🎷 Sonido realista de fagot</b><p class="muted" style="font-size:13px">La primera vez, selecciona bassoon.sf2. Se guardará en este navegador.</p><input id="mainSf2File" type="file" accept=".sf2,application/octet-stream"><button id="loadMainSf2" type="button" class="primary">Cargar sonido de fagot</button></div>
 <p id="playerStatus" class="muted" style="margin-top:16px">Selecciona el banco de fagot para empezar.</p>
 <p class="muted" style="font-size:12px">El sonido se guarda en este navegador para no tener que seleccionarlo cada vez.</p>
 </div>
 </section></main><script>
+document.addEventListener('DOMContentLoaded',()=>{
+ const btn=document.getElementById('toggleScore'),box=document.getElementById('scoreFrameBox'),frame=document.getElementById('scoreFrame');
+ if(!btn||!box||!frame)return;
+ btn.addEventListener('click',()=>{
+  const opening=box.classList.contains('hidden');
+  box.classList.toggle('hidden',!opening);
+  btn.textContent=opening?'🙈 Ocultar partitura':'👁 Mostrar partitura';
+  if(opening&&frame.src==='about:blank')frame.src='./score.html';
+ });
+});
+</script><script>
 window.loginNow=async function(e){
  e.preventDefault();
  const msg=document.getElementById('msg');
