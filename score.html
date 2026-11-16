@@ -37,15 +37,18 @@ button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff
   return events.sort((x,y)=>x.start-y.start).map(e=>toSeconds(e.start));
  }
  function drawLine(line,el,color){
-  // Place each cursor in the exact SVG group that owns the current note.
-  // This preserves the system/group transforms used by OSMD on multi-system scores.
-  const parent=el.parentNode;
-  if(parent&&line.parentNode!==parent)parent.appendChild(line);
-  const b=el.getBBox(),x=b.x+b.width/2,y=b.y+b.height/2;
-  line.setAttribute('x1',x);line.setAttribute('x2',x);
-  line.setAttribute('y1',y-35);line.setAttribute('y2',y+35);
+  // Convert note coordinates into the root SVG coordinate space.
+  const b=el.getBBox(),localX=b.x+b.width/2,localY=b.y+b.height/2;
+  const noteCTM=el.getScreenCTM(),rootCTM=svg.getScreenCTM();
+  if(!noteCTM||!rootCTM)return;
+  const p=svg.createSVGPoint();p.x=localX;p.y=localY;
+  const rootPoint=p.matrixTransform(rootCTM.inverse().multiply(noteCTM));
+  if(line.parentNode!==svg)svg.appendChild(line);
+  line.setAttribute('x1',rootPoint.x);line.setAttribute('x2',rootPoint.x);
+  line.setAttribute('y1',rootPoint.y-38);line.setAttribute('y2',rootPoint.y+38);
   line.setAttribute('stroke',color);line.setAttribute('stroke-width','4');
-  line.setAttribute('stroke-linecap','round');line.setAttribute('visibility','visible');
+  line.setAttribute('stroke-linecap','round');line.setAttribute('pointer-events','none');
+  line.setAttribute('visibility','visible');
  }
  function setVoice(v,index){if(!voices[v].length)return;steps[v]=Math.max(0,Math.min(index,voices[v].length-1));drawLine(lines[v],voices[v][steps[v]],v===0?'#16a34a':'#2563eb')}
  function reset(){setVoice(0,0);setVoice(1,0)}
