@@ -105,14 +105,18 @@ async function preparePlayer(){
  if(!soundReady){const saved=await dbGet();if(saved)await initFagot(saved)}
 }
 $('loadMainSf2').addEventListener('click',async()=>{try{const file=$('mainSf2File').files[0];if(!file)throw Error('Selecciona bassoon.sf2.');$('loadMainSf2').disabled=true;$('playerStatus').textContent='Cargando sonido de fagot...';const buf=await file.arrayBuffer();const savedBuf=buf.slice(0);await initFagot(buf);await dbPut(savedBuf);await loadMidis();$('playerStatus').textContent='¡Fagot cargado y guardado en este navegador!'}catch(e){$('playerStatus').textContent='Error: '+e.message;$('loadMainSf2').disabled=false;console.error(e)}});
-function stopPlayer(){timers.forEach(clearTimeout);timers=[];if(synth)synth.stopAll(true)}
+let cursorTimer=null,cursorStartedAt=0,cursorSpeed=1;
+function sendCursor(type,seconds=0){const frame=$('scoreFrame');if(frame&&frame.contentWindow)frame.contentWindow.postMessage({type,seconds},'*')}
+function stopCursor(reset=true){if(cursorTimer!==null){clearInterval(cursorTimer);cursorTimer=null}if(reset)sendCursor('PROMENADE_CURSOR_RESET')}
+function startCursor(speed){stopCursor(false);cursorSpeed=speed;cursorStartedAt=performance.now();sendCursor('PROMENADE_CURSOR_RESET');cursorTimer=setInterval(()=>{const seconds=Math.max(0,(performance.now()-cursorStartedAt-100)/1000)*cursorSpeed;sendCursor('PROMENADE_CURSOR_TIME',seconds)},50)}
+function stopPlayer(){timers.forEach(clearTimeout);timers=[];stopCursor();if(synth)synth.stopAll(true)}
 function playSelected(){
  stopPlayer();const parts=selectedVoice==='both'?['1','2']:[selectedVoice],speed=Number($('tempo').value)/100;
  for(const p of parts)midiParts[p].tracks.forEach(t=>t.notes.forEach(n=>{const at=100+n.time/speed*1000,d=Math.max(80,n.duration/speed*1000);timers.push(setTimeout(()=>synth.noteOn(0,n.midi,Math.max(1,Math.round((n.velocity||.8)*127))),at));timers.push(setTimeout(()=>synth.noteOff(0,n.midi),at+d))}));
 }
 document.querySelectorAll('[data-voice]').forEach(btn=>btn.addEventListener('click',()=>{selectedVoice=btn.dataset.voice;document.querySelectorAll('[data-voice]').forEach(x=>x.classList.toggle('primary',x===btn));$('playerStatus').textContent='Seleccionado: '+(selectedVoice==='both'?'las dos partes':'parte '+selectedVoice)+'.'}));
 $('tempo').addEventListener('input',e=>$('tempoValue').textContent=e.target.value+'%');
-$('playPromenade').addEventListener('click',async()=>{try{$('playerStatus').textContent='Preparando el reproductor...';await preparePlayer();if(!soundReady){$('playerStatus').textContent='Selecciona bassoon.sf2 y pulsa «Cargar sonido de fagot».';return}await audioContext.resume();playSelected();$('playerStatus').textContent='Reproduciendo '+(selectedVoice==='both'?'las dos partes':'la parte '+selectedVoice)+'.'}catch(e){$('playerStatus').textContent='Error: '+e.message;console.error(e)}});
+$('playPromenade').addEventListener('click',async()=>{try{$('playerStatus').textContent='Preparando el reproductor...';await preparePlayer();if(!soundReady){$('playerStatus').textContent='Selecciona bassoon.sf2 y pulsa «Cargar sonido de fagot».';return}await audioContext.resume();playSelected();startCursor(Number($('tempo').value)/100);$('playerStatus').textContent='Reproduciendo '+(selectedVoice==='both'?'las dos partes':'la parte '+selectedVoice)+'.'}catch(e){$('playerStatus').textContent='Error: '+e.message;console.error(e)}});
 $('pausePromenade').addEventListener('click',()=>{stopPlayer();$('playerStatus').textContent='Reproducción detenida.'});
 $('stopPromenade').addEventListener('click',()=>{stopPlayer();$('playerStatus').textContent='Reproducción detenida.'});
 
