@@ -90,10 +90,19 @@ button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff
  }
  function control(type,seconds=0){
   if(!ready)return;
-  if(type==='PROMENADE_CURSOR_RESET'){reset();return}
+  if(type==='PROMENADE_CURSOR_RESET'){
+   reset();
+   status.textContent='Cursores reiniciados · Verde 1/37 · Azul 1/39';
+   return;
+  }
   if(type==='PROMENADE_CURSOR_TIME'){
-   const t=Math.max(0,Number(seconds)||0);
-   for(let v=0;v<2;v++){let i=0;while(i+1<times[v].length&&times[v][i+1]<=t)i++;setVoice(v,i)}
+   const t=Math.max(0,Number(seconds)||0),indices=[];
+   for(let v=0;v<2;v++){
+    let i=0;
+    while(i+1<times[v].length&&times[v][i+1]<=t)i++;
+    setVoice(v,i);indices.push(i+1);
+   }
+   status.textContent='Sincronía · '+t.toFixed(2)+' s · Verde '+indices[0]+'/37 · Azul '+indices[1]+'/39';
   }
  }
  window.promenaCursorControl=control;
