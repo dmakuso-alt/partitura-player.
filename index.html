@@ -120,6 +120,6 @@ $('playPromenade').addEventListener('click',async()=>{try{$('playerStatus').text
 $('pausePromenade').addEventListener('click',()=>{stopPlayer();$('playerStatus').textContent='Reproducción detenida.'});
 $('stopPromenade').addEventListener('click',()=>{stopPlayer();$('playerStatus').textContent='Reproducción detenida.'});
 
-$('showScoreBtn').addEventListener('click',()=>{const box=$('scoreFrameBox'),frame=$('scoreFrame');const opening=box.classList.contains('hidden');box.classList.toggle('hidden',!opening);$('showScoreBtn').textContent=opening?'🙈 Ocultar partitura':'👁 Mostrar partitura';if(opening&&frame.src==='about:blank')frame.src='./score.html?v=31'});
+$('showScoreBtn').addEventListener('click',()=>{const box=$('scoreFrameBox'),frame=$('scoreFrame');const opening=box.classList.contains('hidden');box.classList.toggle('hidden',!opening);$('showScoreBtn').textContent=opening?'🙈 Ocultar partitura':'👁 Mostrar partitura';if(opening&&frame.src==='about:blank')frame.src='./score.html?v=32'});
 const {data:{session}}=await supabase.auth.getSession();if(session)go(session.user);
 </script></body></html>
