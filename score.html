@@ -1,48 +1,50 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Partitura Promenade</title><style>body{margin:0;padding:12px;font-family:Arial,sans-serif;background:#fff;color:#253047}#status{color:#6d7787;font-size:14px;margin:4px 0 12px}#score{width:100%;overflow:auto}button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff;font-weight:bold;cursor:pointer;margin-right:6px}</style><script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.2/build/opensheetmusicdisplay.min.js"></script></head><body><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button id="reload">↻ Recargar partitura</button><button id="testStep">Avanzar cursor ▶</button><span id="status">Preparando partitura...</span></div><div id="score">Cargando...</div><script>
 (async()=>{
  const status=document.getElementById('status'),target=document.getElementById('score');
- let osmd=null,cursor=null,lastStepSeconds=0,receivedMessages=0;
+ let osmd=null,svg=null,targets=[],marker=null,step=0,received=0;
+ const ns='http://www.w3.org/2000/svg';
+ function setMarker(index){
+  if(!targets.length||!marker)return;
+  step=Math.max(0,Math.min(index,targets.length-1));
+  const b=targets[step].getBBox(),x=b.x+b.width/2,y=b.y+b.height/2;
+  marker.setAttribute('x1',x);marker.setAttribute('x2',x);
+  marker.setAttribute('y1',Math.max(0,y-38));marker.setAttribute('y2',y+38);
+  marker.setAttribute('visibility','visible');
+  status.textContent='Cursor visual propio · nota '+(step+1)+' de '+targets.length;
+ }
+ function resetMarker(){step=0;if(targets.length)setMarker(0)}
  async function render(){
-  status.textContent='Cargando la partitura original...';target.textContent='';
+  status.textContent='Cargando partitura...';target.textContent='';targets=[];marker=null;svg=null;
   try{
    const lib=window.opensheetmusicdisplay;
    if(!lib||!lib.OpenSheetMusicDisplay)throw Error('No se ha cargado OpenSheetMusicDisplay.');
    const response=await fetch('./assets/promenade.musicxml',{cache:'no-store'});
    if(!response.ok)throw Error('No se encuentra MusicXML ('+response.status+').');
-   const xml=await response.text();
-   osmd=new lib.OpenSheetMusicDisplay(target,{autoResize:true,backend:'svg',drawTitle:false,drawPartNames:true,followCursor:true});
-   await osmd.load(xml);
-   osmd.render();
-   // OSMD 1.9.x requires explicitly enabling cursors so that it creates and initializes
-   // the cursor against the rendered graphical sheet.
-   osmd.enableOrDisableCursors(true);
-   cursor=osmd.cursor;
-   if(!cursor)throw Error('OSMD no ha creado el cursor.');
-   if(!osmd.Sheet || !osmd.Sheet.MusicPartManager || !osmd.GraphicSheet)throw Error('No se han preparado los datos gráficos y musicales del cursor.');
-   cursor.init(osmd.Sheet.MusicPartManager,osmd.GraphicSheet);
-   cursor.cursorElement.style.zIndex='1000';
-   cursor.cursorElement.style.pointerEvents='none';
-   cursor.cursorElement.style.position='absolute';
-   cursor.show();cursor.reset();cursor.update();
-   lastStepSeconds=0;
-   status.textContent='Partitura cargada · cursor inicializado correctamente';
-  }catch(err){status.textContent='Error: '+err.message;target.textContent='No se pudo mostrar la partitura.';console.error(err)}
+   osmd=new lib.OpenSheetMusicDisplay(target,{autoResize:true,backend:'svg',drawTitle:false,drawPartNames:true,followCursor:false});
+   await osmd.load(await response.text());osmd.render();
+   svg=target.querySelector('svg');
+   if(!svg)throw Error('El visor no ha generado un SVG.');
+   // Independent overlay: use the rendered VexFlow notehead geometry, not OSMD's built-in cursor.
+   targets=Array.from(svg.querySelectorAll('.vf-notehead'));
+   if(!targets.length)targets=Array.from(svg.querySelectorAll('[class*="notehead"]'));
+   if(!targets.length)throw Error('No encuentro las cabezas de nota en el SVG. Clases detectadas: '+Array.from(svg.querySelectorAll('[class]')).slice(0,20).map(e=>e.getAttribute('class')).join(', '));
+   marker=document.createElementNS(ns,'line');
+   marker.setAttribute('stroke','#00a650');marker.setAttribute('stroke-width','3.5');marker.setAttribute('stroke-linecap','round');marker.setAttribute('pointer-events','none');marker.setAttribute('visibility','hidden');
+   svg.appendChild(marker);resetMarker();
+   status.textContent='Cursor visual preparado · '+targets.length+' cabezas de nota detectadas';
+  }catch(err){status.textContent='Error: '+err.message;console.error(err)}
  }
  function control(type,seconds=0){
-  if(!cursor){status.textContent='El cursor aún no está inicializado';return}
-  try{
-   if(type==='PROMENADE_CURSOR_RESET'){cursor.reset();cursor.show();cursor.update();lastStepSeconds=0;status.textContent='Cursor reiniciado';return}
-   if(type==='PROMENADE_CURSOR_TIME'){
-    const steps=Math.floor(Math.max(0,Number(seconds)||0)/0.28);
-    while(lastStepSeconds<steps&&lastStepSeconds<1000){cursor.next();lastStepSeconds++}
-    cursor.update();
-    if(receivedMessages++%20===0)status.textContent='Cursor conectado · avance '+lastStepSeconds+' posiciones';
-   }
-  }catch(err){status.textContent='Error de cursor: '+err.message;console.error(err)}
+  if(!targets.length)return;
+  if(type==='PROMENADE_CURSOR_RESET'){resetMarker();return}
+  if(type==='PROMENADE_CURSOR_TIME'){
+   const idx=Math.floor(Math.max(0,Number(seconds)||0)/0.28);
+   setMarker(idx);
+  }
  }
  window.promenaCursorControl=control;
- window.addEventListener('message',event=>{const d=event.data;if(d&&d.type)control(d.type,d.seconds||0)});
- document.getElementById('testStep').addEventListener('click',()=>{if(!cursor){status.textContent='Cursor no inicializado';return}cursor.next();cursor.update();cursor.show();status.textContent='Prueba manual · cursor avanzado'});
+ window.addEventListener('message',e=>{const d=e.data;if(d&&d.type)control(d.type,d.seconds||0)});
+ document.getElementById('testStep').addEventListener('click',()=>{if(!targets.length){status.textContent='No hay notas detectadas';return}setMarker(step+1)});
  document.getElementById('reload').addEventListener('click',render);
  await render();
 })();
