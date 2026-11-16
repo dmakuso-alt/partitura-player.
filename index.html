@@ -1,4 +1,26 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6b4fc8"><title>Partitura Player</title><style>body{margin:0;font-family:Arial;background:#f4f6fb;color:#253047}header{background:#fff;padding:15px 6%;display:flex;justify-content:space-between;box-shadow:0 2px 12px #0001}.brand,h1{color:#6b4fc8}button,input,select{padding:12px;border-radius:10px;border:1px solid #dbe0ea;font:inherit}button{cursor:pointer;border:0;font-weight:bold}.primary{background:#6b4fc8;color:#fff}.hidden{display:none!important}main{max-width:1000px;margin:auto;padding:25px 18px}.view{display:none}.view.active{display:block}.panel,.card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 25px #0000000d}.auth{max-width:500px;margin:30px auto}.tabs{display:flex;gap:8px;margin:15px 0}.tabs button{flex:1}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.card{text-align:left}.muted{color:#6d7787}form{display:grid;gap:10px}@media(max-width:700px){.grid{grid-template-columns:1fr}header{flex-direction:column;gap:10px}}</style></head><body><header><div class="brand">🎼 Partitura Player</div><nav id="nav" class="hidden"><button onclick="show('home')">🏠 Inicio</button><button onclick="show('students')">🎒 Alumnos</button><button onclick="logout()">Salir</button></nav></header><main><section id="login" class="view active"><div class="panel auth"><h1>🎶 Bienvenido</h1><p class="muted">Plataforma musical educativa</p><div class="tabs"><button onclick="tab('in')">Entrar</button><button onclick="tab('up')">Crear cuenta</button></div><form id="in" onsubmit="enter(event)"><input id="emailIn" type="email" placeholder="Email" required><input id="passIn" type="password" placeholder="Contraseña" required><button class="primary">Entrar</button></form><form id="up" class="hidden" onsubmit="register(event)"><input id="name" placeholder="Nombre completo" required><input id="email" type="email" placeholder="Email" required><input id="pass" type="password" minlength="6" placeholder="Contraseña (mínimo 6 caracteres)" required><select id="role" onchange="inst()"><option value="profesor">👩‍🏫 Profesor</option><option value="alumno">🎒 Alumno</option></select><select id="instrument" class="hidden"><option value="">Selecciona instrumento</option><option>Clarinete</option><option>Fagot</option><option>Acordeón</option><option>Flauta travesera</option><option>Guitarra</option><option>Violonchelo</option><option>Piano</option><option>Batería</option></select><button class="primary">Crear cuenta</button></form><p id="msg" class="muted"></p></div></section><section id="home" class="view"><div class="panel"><h1 id="hello"></h1><p class="muted">Tu plataforma musical conectada a la nube.</p></div><div class="grid"><div class="card">🎒<h3>Alumnos</h3><p class="muted">Un instrumento por alumno.</p></div><div class="card">🎼<h3>Partituras</h3><p class="muted">Biblioteca musical.</p></div><div class="card">☁️<h3>Sincronizado</h3><p class="muted">Datos guardados en Supabase.</p></div></div></section><section id="students" class="view"><div class="panel"><h1>🎒 Alumnos</h1><p class="muted">Cada alumno tiene un único instrumento.</p><form onsubmit="addStudent(event)" style="max-width:520px"><input id="studentName" placeholder="Nombre del alumno" required><select id="studentInstrument"><option value="">Selecciona instrumento</option><option>Clarinete</option><option>Fagot</option><option>Acordeón</option><option>Flauta travesera</option><option>Guitarra</option><option>Violonchelo</option><option>Piano</option><option>Batería</option></select><button class="primary">➕ Añadir alumno</button></form><p id="studentMsg" class="muted"></p><div id="studentList" class="grid" style="margin-top:20px"></div></div></section><section id="studentDetail" class="view"><div class="panel"><button onclick="show('students')">← Volver a alumnos</button><h1 id="detailName" style="margin-top:20px"></h1><p id="detailInstrument" class="muted"></p><hr style="border:0;border-top:1px solid #e6e9f0;margin:22px 0"><h2>🎼 Partituras</h2><p class="muted">Aquí podrás organizar las partituras de este alumno.</p><div id="scoreList" class="grid"></div><button class="primary" style="margin-top:18px" onclick="comingSoon()">➕ Añadir partitura</button></div></section></main><script type="module">
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#6b4fc8"><title>Partitura Player</title><style>body{margin:0;font-family:Arial;background:#f4f6fb;color:#253047}header{background:#fff;padding:15px 6%;display:flex;justify-content:space-between;box-shadow:0 2px 12px #0001}.brand,h1{color:#6b4fc8}button,input,select{padding:12px;border-radius:10px;border:1px solid #dbe0ea;font:inherit}button{cursor:pointer;border:0;font-weight:bold}.primary{background:#6b4fc8;color:#fff}.hidden{display:none!important}main{max-width:1000px;margin:auto;padding:25px 18px}.view{display:none}.view.active{display:block}.panel,.card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 25px #0000000d}.auth{max-width:500px;margin:30px auto}.tabs{display:flex;gap:8px;margin:15px 0}.tabs button{flex:1}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.card{text-align:left}.muted{color:#6d7787}form{display:grid;gap:10px}@media(max-width:700px){.grid{grid-template-columns:1fr}header{flex-direction:column;gap:10px}}</style></head><body><header><div class="brand">🎼 Partitura Player</div><nav id="nav" class="hidden"><button onclick="show('home')">🏠 Inicio</button><button onclick="show('students')">🎒 Alumnos</button><button onclick="show('player')">🎹 Reproductor</button><button onclick="logout()">Salir</button></nav></header><main><section id="login" class="view active"><div class="panel auth"><h1>🎶 Bienvenido</h1><p class="muted">Plataforma musical educativa</p><div class="tabs"><button onclick="tab('in')">Entrar</button><button onclick="tab('up')">Crear cuenta</button></div><form id="in" onsubmit="enter(event)"><input id="emailIn" type="email" placeholder="Email" required><input id="passIn" type="password" placeholder="Contraseña" required><button class="primary">Entrar</button></form><form id="up" class="hidden" onsubmit="register(event)"><input id="name" placeholder="Nombre completo" required><input id="email" type="email" placeholder="Email" required><input id="pass" type="password" minlength="6" placeholder="Contraseña (mínimo 6 caracteres)" required><select id="role" onchange="inst()"><option value="profesor">👩‍🏫 Profesor</option><option value="alumno">🎒 Alumno</option></select><select id="instrument" class="hidden"><option value="">Selecciona instrumento</option><option>Clarinete</option><option>Fagot</option><option>Acordeón</option><option>Flauta travesera</option><option>Guitarra</option><option>Violonchelo</option><option>Piano</option><option>Batería</option></select><button class="primary">Crear cuenta</button></form><p id="msg" class="muted"></p></div></section><section id="home" class="view"><div class="panel"><h1 id="hello"></h1><p class="muted">Tu plataforma musical conectada a la nube.</p></div><div class="grid"><div class="card">🎒<h3>Alumnos</h3><p class="muted">Un instrumento por alumno.</p></div><div class="card">🎼<h3>Partituras</h3><p class="muted">Biblioteca musical.</p></div><div class="card">☁️<h3>Sincronizado</h3><p class="muted">Datos guardados en Supabase.</p></div></div></section><section id="students" class="view"><div class="panel"><h1>🎒 Alumnos</h1><p class="muted">Cada alumno tiene un único instrumento.</p><form onsubmit="addStudent(event)" style="max-width:520px"><input id="studentName" placeholder="Nombre del alumno" required><select id="studentInstrument"><option value="">Selecciona instrumento</option><option>Clarinete</option><option>Fagot</option><option>Acordeón</option><option>Flauta travesera</option><option>Guitarra</option><option>Violonchelo</option><option>Piano</option><option>Batería</option></select><button class="primary">➕ Añadir alumno</button></form><p id="studentMsg" class="muted"></p><div id="studentList" class="grid" style="margin-top:20px"></div></div></section><section id="studentDetail" class="view"><div class="panel"><button onclick="show('students')">← Volver a alumnos</button><h1 id="detailName" style="margin-top:20px"></h1><p id="detailInstrument" class="muted"></p><hr style="border:0;border-top:1px solid #e6e9f0;margin:22px 0"><h2>🎼 Partituras</h2><p class="muted">Aquí podrás organizar las partituras de este alumno.</p><div id="scoreList" class="grid"></div><button class="primary" style="margin-top:18px" onclick="comingSoon()">➕ Añadir partitura</button></div></section>
+<section id="player" class="view">
+<div class="panel">
+<h1>🎹 Reproductor · Promenade</h1>
+<p class="muted">Practica las dos partes de fagot por separado o juntas. Puedes cambiar la velocidad sin alterar la afinación.</p>
+<div class="tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0">
+<button type="button" class="primary" data-voice="1">🎵 Parte 1</button>
+<button type="button" data-voice="2">🎵 Parte 2</button>
+<button type="button" data-voice="both">🎼 Las dos partes</button>
+</div>
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+<label for="tempo" style="font-weight:bold">Velocidad: <span id="tempoValue">100%</span></label>
+<input id="tempo" type="range" min="50" max="140" value="100" style="max-width:320px">
+</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+<button id="playPromenade" class="primary">▶ Reproducir</button>
+<button id="pausePromenade">⏸ Pausar</button>
+<button id="stopPromenade">⏹ Detener</button>
+</div>
+<p id="playerStatus" class="muted" style="margin-top:16px">Selecciona una parte y pulsa Reproducir.</p>
+<p class="muted" style="font-size:12px">Conversión automática de Audiveris: conviene revisar las notas con la partitura original.</p>
+</div>
+</section></main><script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const supabase=createClient('https://zixwtldnkbhqwqbfdplq.supabase.co','sb_publishable_xvFjwbtCCZpaKRRaXivytQ_O0sdY6gW');
 const $=id=>document.getElementById(id);
@@ -51,6 +73,57 @@ async function loadStudents(){
  if(error){$('studentList').innerHTML='<p class="muted">Todavía no hay alumnos guardados.</p>';return}
  $('studentList').innerHTML=(data||[]).map(s=>'<div class="card" style="cursor:pointer" onclick="openStudent('+JSON.stringify(s.id)+','+JSON.stringify(s.name)+','+JSON.stringify(s.instrument)+')">🎒<h3>'+s.name+'</h3><p class="muted">🎵 '+s.instrument+'</p><p style="color:#6b4fc8;font-weight:bold">Ver ficha →</p></div>').join('')||'<p class="muted">Todavía no tienes alumnos.</p>';
 }
+
+
+/* Reproductor MIDI de Promenade */
+let ToneLib, MidiLib, playerSynth, midiParts={};
+let selectedVoice='1';
+async function preparePromenade(){
+ if(midiParts['1']&&midiParts['2'])return;
+ $('playerStatus').textContent='Cargando las dos partes de Promenade...';
+ try{
+  const [toneModule,midiModule]=await Promise.all([
+   import('https://cdn.jsdelivr.net/npm/tone@15.1.22/+esm'),
+   import('https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/+esm')
+  ]);
+  ToneLib=toneModule;MidiLib=midiModule.Midi;
+  const paths={1:'./assets/promenade_parte_1.mid.b64',2:'./assets/promenade_parte_2.mid.b64'};
+  for(const part of ['1','2']){
+   const response=await fetch(paths[part]);
+   if(!response.ok)throw new Error('No se ha podido cargar la parte '+part);
+   const encoded=(await response.text()).trim();
+   const raw=atob(encoded),bytes=new Uint8Array(raw.length);
+   for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+   midiParts[part]=new MidiLib(bytes);
+  }
+  playerSynth=new ToneLib.PolySynth(ToneLib.Synth,{oscillator:{type:'triangle'},envelope:{attack:0.01,decay:0.12,sustain:0.35,release:0.8}}).toDestination();
+  $('playerStatus').textContent='Promenade está lista. Elige Parte 1, Parte 2 o las dos.';
+ }catch(error){$('playerStatus').textContent='Error al cargar el reproductor: '+error.message}
+}
+function clearPromenade(){if(!ToneLib)return;ToneLib.Transport.stop();ToneLib.Transport.cancel();if(playerSynth)playerSynth.releaseAll()}
+function schedulePromenade(){
+ clearPromenade();
+ const chosen=selectedVoice==='both'?['1','2']:[selectedVoice];
+ const speed=Number($('tempo').value)/100;
+ chosen.forEach(part=>midiParts[part].tracks.forEach(track=>track.notes.forEach(note=>{
+  const at=note.time/speed,dur=Math.max(.08,note.duration/speed);
+  ToneLib.Transport.schedule(time=>playerSynth.triggerAttackRelease(note.name,dur,time,note.velocity||0.8),at);
+ })));
+}
+document.querySelectorAll('[data-voice]').forEach(button=>button.addEventListener('click',()=>{
+ selectedVoice=button.dataset.voice;
+ document.querySelectorAll('[data-voice]').forEach(b=>b.classList.toggle('primary',b===button));
+ if(ToneLib&&midiParts['1']&&midiParts['2'])schedulePromenade();
+ $('playerStatus').textContent='Seleccionado: '+(selectedVoice==='both'?'las dos partes':'parte '+selectedVoice)+'. Pulsa Reproducir.';
+}));
+$('tempo').addEventListener('input',e=>{$('tempoValue').textContent=e.target.value+'%';if(ToneLib&&midiParts['1']&&midiParts['2']&&ToneLib.Transport.state!=='started')schedulePromenade()});
+$('playPromenade').addEventListener('click',async()=>{
+ await preparePromenade();if(!ToneLib||!midiParts['1'])return;
+ await ToneLib.start();schedulePromenade();ToneLib.Transport.start();
+ $('playerStatus').textContent='Reproduciendo '+(selectedVoice==='both'?'las dos partes':'la parte '+selectedVoice)+'.';
+});
+$('pausePromenade').addEventListener('click',()=>{if(ToneLib){ToneLib.Transport.pause();$('playerStatus').textContent='Reproducción pausada.'}});
+$('stopPromenade').addEventListener('click',()=>{clearPromenade();$('playerStatus').textContent='Reproducción detenida.'});
 
 const {data:{session}}=await supabase.auth.getSession();if(session)go(session.user);
 </script></body></html>
