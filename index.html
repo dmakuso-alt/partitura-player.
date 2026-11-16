@@ -84,7 +84,7 @@ async function loadStudents(){
 
 /* Reproductor MIDI de Promenade con SoundFont realista */
 import { WorkletSynthesizer } from 'https://cdn.jsdelivr.net/npm/spessasynth_lib@4.4.8/+esm';
-let MidiLib,midiParts={},synth=null,audioContext=null,selectedVoice='1',soundReady=false,timers=[],scoreSyncTimer=null,scoreSyncStart=0;
+let MidiLib,midiParts={},synth=null,audioContext=null,selectedVoice='1',soundReady=false,timers=[];
 const DB='partitura-player-audio',STORE='soundfonts';
 function dbOpen(){return new Promise((ok,no)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
 async function dbPut(buf){const d=await dbOpen();return new Promise((ok,no)=>{const t=d.transaction(STORE,'readwrite');t.objectStore(STORE).put(buf,'ethan-bassoon');t.oncomplete=ok;t.onerror=()=>no(t.error)})}
@@ -105,18 +105,10 @@ async function preparePlayer(){
  if(!soundReady){const saved=await dbGet();if(saved)await initFagot(saved)}
 }
 $('loadMainSf2').addEventListener('click',async()=>{try{const file=$('mainSf2File').files[0];if(!file)throw Error('Selecciona bassoon.sf2.');$('loadMainSf2').disabled=true;$('playerStatus').textContent='Cargando sonido de fagot...';const buf=await file.arrayBuffer();const savedBuf=buf.slice(0);await initFagot(buf);await dbPut(savedBuf);await loadMidis();$('playerStatus').textContent='¡Fagot cargado y guardado en este navegador!'}catch(e){$('playerStatus').textContent='Error: '+e.message;$('loadMainSf2').disabled=false;console.error(e)}});
-function stopPlayer(){timers.forEach(clearTimeout);timers=[];if(scoreSyncTimer){clearInterval(scoreSyncTimer);scoreSyncTimer=null}if(synth)synth.stopAll(true)}
+function stopPlayer(){timers.forEach(clearTimeout);timers=[];if(synth)synth.stopAll(true)}
 function playSelected(){
  stopPlayer();const parts=selectedVoice==='both'?['1','2']:[selectedVoice],speed=Number($('tempo').value)/100;
  for(const p of parts)midiParts[p].tracks.forEach(t=>t.notes.forEach(n=>{const at=100+n.time/speed*1000,d=Math.max(80,n.duration/speed*1000);timers.push(setTimeout(()=>synth.noteOn(0,n.midi,Math.max(1,Math.round((n.velocity||.8)*127))),at));timers.push(setTimeout(()=>synth.noteOff(0,n.midi),at+d))}));
- startScoreFollow(speed,parts);
-}
-function startScoreFollow(speed,parts){
- const frame=$('scoreFrame');if(!frame||!frame.contentWindow||$('scoreFrameBox').classList.contains('hidden'))return;
- const durations=parts.flatMap(p=>midiParts[p].tracks.flatMap(t=>t.notes.map(n=>n.time+n.duration)));
- const total=Math.max(0,...durations);scoreSyncStart=Date.now()+100;
- frame.contentWindow.postMessage({type:'PROMENADE_CURSOR_RESET'},'*');
- scoreSyncTimer=setInterval(()=>{const elapsed=Math.max(0,(Date.now()-scoreSyncStart)/1000)*speed;frame.contentWindow.postMessage({type:'PROMENADE_CURSOR_TIME',seconds:elapsed},'*');if(elapsed>total+1){clearInterval(scoreSyncTimer);scoreSyncTimer=null}},80);
 }
 document.querySelectorAll('[data-voice]').forEach(btn=>btn.addEventListener('click',()=>{selectedVoice=btn.dataset.voice;document.querySelectorAll('[data-voice]').forEach(x=>x.classList.toggle('primary',x===btn));$('playerStatus').textContent='Seleccionado: '+(selectedVoice==='both'?'las dos partes':'parte '+selectedVoice)+'.'}));
 $('tempo').addEventListener('input',e=>$('tempoValue').textContent=e.target.value+'%');
