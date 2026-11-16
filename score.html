@@ -60,7 +60,7 @@ button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff
    if(!xr.ok||!m1.ok||!m2.ok)throw Error('No se han podido cargar los archivos de partitura.');
    const xml=await xr.text(),[t1,t2]=await Promise.all([m1.text(),m2.text()]);
    times=[parseMidi(t1.trim()),parseMidi(t2.trim())];
-   osmd=new lib.OpenSheetMusicDisplay(target,{autoResize:true,backend:'svg',drawTitle:false,drawPartNames:true,followCursor:false});
+   osmd=new lib.OpenSheetMusicDisplay(target,{autoResize:false,backend:'svg',drawTitle:false,drawPartNames:true,followCursor:false});
    await osmd.load(xml);osmd.render();svg=target.querySelector('svg');if(!svg)throw Error('El visor no ha generado la partitura.');
    const all=Array.from(svg.querySelectorAll('.vf-notehead')).length?Array.from(svg.querySelectorAll('.vf-notehead')):Array.from(svg.querySelectorAll('[class*="notehead"]'));
    if(all.length!==76)throw Error('Se esperaban 76 cabezas de nota y se han detectado '+all.length+'.');
