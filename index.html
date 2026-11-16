@@ -94,7 +94,7 @@ async function preparePromenade(){
    const encoded=(await response.text()).trim();
    const raw=atob(encoded),bytes=new Uint8Array(raw.length);
    for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-   midiParts[part]=new MidiLib(bytes);
+   midiParts[part]=new MidiLib(bytes.buffer);
   }
   playerSynth=new ToneLib.PolySynth(ToneLib.Synth,{oscillator:{type:'triangle'},envelope:{attack:0.01,decay:0.12,sustain:0.35,release:0.8}}).toDestination();
   $('playerStatus').textContent='El reproductor está listo para recibir los dos MIDI originales.';
