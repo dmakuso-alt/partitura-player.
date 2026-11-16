@@ -20,6 +20,9 @@
    if(!cursor)throw Error('OSMD no ha creado el cursor.');
    if(!osmd.Sheet || !osmd.Sheet.MusicPartManager || !osmd.GraphicSheet)throw Error('No se han preparado los datos gráficos y musicales del cursor.');
    cursor.init(osmd.Sheet.MusicPartManager,osmd.GraphicSheet);
+   cursor.cursorElement.style.zIndex='1000';
+   cursor.cursorElement.style.pointerEvents='none';
+   cursor.cursorElement.style.position='absolute';
    cursor.show();cursor.reset();cursor.update();
    lastStepSeconds=0;
    status.textContent='Partitura cargada · cursor inicializado correctamente';
