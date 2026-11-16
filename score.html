@@ -1,50 +1,77 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Partitura Promenade</title><style>body{margin:0;padding:12px;font-family:Arial,sans-serif;background:#fff;color:#253047}#status{color:#6d7787;font-size:14px;margin:4px 0 12px}#score{width:100%;overflow:auto}button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff;font-weight:bold;cursor:pointer;margin-right:6px}</style><script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.2/build/opensheetmusicdisplay.min.js"></script></head><body><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button id="reload">↻ Recargar partitura</button><button id="testStep">Avanzar cursor ▶</button><span id="status">Preparando partitura...</span></div><div id="score">Cargando...</div><script>
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Partitura Promenade</title>
+<style>
+body{margin:0;padding:12px;font-family:Arial,sans-serif;background:#fff;color:#253047}
+#status{color:#596579;font-size:14px;margin:6px 0 12px}
+#score{width:100%;overflow:auto}
+button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff;font-weight:bold;cursor:pointer;margin-right:6px}
+.legend{display:inline-flex;gap:6px;align-items:center;font-size:13px;margin:5px 12px 8px 0}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.2/build/opensheetmusicdisplay.min.js"></script></head>
+<body>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+<button id="reload">↻ Recargar partitura</button><button id="testStep">Avanzar cursores ▶</button>
+<span class="legend"><i class="dot" style="background:#16a34a"></i> Voz 1</span><span class="legend"><i class="dot" style="background:#2563eb"></i> Voz 2</span>
+</div><div id="status">Preparando partitura...</div><div id="score">Cargando...</div>
+<script>
 (async()=>{
- const status=document.getElementById('status'),target=document.getElementById('score');
- let osmd=null,svg=null,targets=[],marker=null,step=0,received=0;
- const ns='http://www.w3.org/2000/svg';
- function setMarker(index){
-  if(!targets.length||!marker)return;
-  step=Math.max(0,Math.min(index,targets.length-1));
-  const b=targets[step].getBBox(),x=b.x+b.width/2,y=b.y+b.height/2;
-  marker.setAttribute('x1',x);marker.setAttribute('x2',x);
-  marker.setAttribute('y1',Math.max(0,y-38));marker.setAttribute('y2',y+38);
-  marker.setAttribute('visibility','visible');
-  status.textContent='Cursor visual propio · nota '+(step+1)+' de '+targets.length;
+ const status=document.getElementById('status'),target=document.getElementById('score'),ns='http://www.w3.org/2000/svg';
+ let osmd,svg,voices=[[],[]],lines=[],times=[[],[]],steps=[0,0],ready=false;
+ function vlq(a,p){let v=0,b;do{b=a[p++];v=(v<<7)|(b&127)}while(b&128);return [v,p]}
+ function decode64(s){const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',out=[];let acc=0,bits=0;for(const c of s){if(c==='=')break;acc=(acc<<6)|chars.indexOf(c);bits+=6;if(bits>=8){bits-=8;out.push((acc>>bits)&255)}}return out}
+ function parseMidi(b64){
+  const a=decode64(b64);let p=14,tick=0,running=0,tempo=500000,events=[],active=new Map(),tempos=[];
+  while(p<a.length){
+   let z=vlq(a,p);tick+=z[0];p=z[1];let st=a[p++];
+   if(st<128){p--;st=running}else if(st<240)running=st;
+   if(st===255){const type=a[p++],q=vlq(a,p);p=q[1];const len=q[0];if(type===81&&len===3){tempo=(a[p]<<16)|(a[p+1]<<8)|a[p+2];tempos.push({tick,tempo})}p+=len;continue}
+   if(st===240||st===247){const q=vlq(a,p);p=q[1]+q[0];continue}
+   const hi=st&240,n=a[p++],v=a[p++];
+   if(hi===144&&v>0){if(!active.has(n))active.set(n,[]);active.get(n).push(tick)}
+   else if(hi===128||(hi===144&&v===0)){const q=active.get(n);if(q&&q.length)events.push({pitch:n,start:q.shift(),end:tick})}
+  }
+  const ppq=((a[12]<<8)|a[13])&0x7fff;
+  function toSeconds(t){let sec=0,last=0,us=500000;for(const e of tempos){if(e.tick>=t)break;sec+=(e.tick-last)*us/(ppq*1e6);last=e.tick;us=e.tempo}return sec+(t-last)*us/(ppq*1e6)}
+  return events.sort((x,y)=>x.start-y.start).map(e=>toSeconds(e.start));
  }
- function resetMarker(){step=0;if(targets.length)setMarker(0)}
+ function drawLine(line,el,color){
+  const b=el.getBBox(),x=b.x+b.width/2,y=b.y+b.height/2;
+  line.setAttribute('x1',x);line.setAttribute('x2',x);
+  line.setAttribute('y1',Math.max(0,y-35));line.setAttribute('y2',y+35);line.setAttribute('visibility','visible');
+ }
+ function setVoice(v,index){if(!voices[v].length)return;steps[v]=Math.max(0,Math.min(index,voices[v].length-1));drawLine(lines[v],voices[v][steps[v]],v===0?'#16a34a':'#2563eb')}
+ function reset(){setVoice(0,0);setVoice(1,0)}
  async function render(){
-  status.textContent='Cargando partitura...';target.textContent='';targets=[];marker=null;svg=null;
+  ready=false;status.textContent='Cargando partitura y tiempos MIDI...';target.textContent='';voices=[[],[]];lines=[];steps=[0,0];
   try{
-   const lib=window.opensheetmusicdisplay;
-   if(!lib||!lib.OpenSheetMusicDisplay)throw Error('No se ha cargado OpenSheetMusicDisplay.');
-   const response=await fetch('./assets/promenade.musicxml',{cache:'no-store'});
-   if(!response.ok)throw Error('No se encuentra MusicXML ('+response.status+').');
+   const lib=window.opensheetmusicdisplay;if(!lib||!lib.OpenSheetMusicDisplay)throw Error('No se ha cargado el visor.');
+   const [xr,m1,m2]=await Promise.all([fetch('./assets/promenade.musicxml?v=29',{cache:'no-store'}),fetch('./assets/promenade_parte_1.mid.b64?v=29',{cache:'no-store'}),fetch('./assets/promenade_parte_2.mid.b64?v=29',{cache:'no-store'})]);
+   if(!xr.ok||!m1.ok||!m2.ok)throw Error('No se han podido cargar los archivos de partitura.');
+   const xml=await xr.text(),[t1,t2]=await Promise.all([m1.text(),m2.text()]);
+   times=[parseMidi(t1.trim()),parseMidi(t2.trim())];
    osmd=new lib.OpenSheetMusicDisplay(target,{autoResize:true,backend:'svg',drawTitle:false,drawPartNames:true,followCursor:false});
-   await osmd.load(await response.text());osmd.render();
-   svg=target.querySelector('svg');
-   if(!svg)throw Error('El visor no ha generado un SVG.');
-   // Independent overlay: use the rendered VexFlow notehead geometry, not OSMD's built-in cursor.
-   targets=Array.from(svg.querySelectorAll('.vf-notehead'));
-   if(!targets.length)targets=Array.from(svg.querySelectorAll('[class*="notehead"]'));
-   if(!targets.length)throw Error('No encuentro las cabezas de nota en el SVG. Clases detectadas: '+Array.from(svg.querySelectorAll('[class]')).slice(0,20).map(e=>e.getAttribute('class')).join(', '));
-   marker=document.createElementNS(ns,'line');
-   marker.setAttribute('stroke','#00a650');marker.setAttribute('stroke-width','3.5');marker.setAttribute('stroke-linecap','round');marker.setAttribute('pointer-events','none');marker.setAttribute('visibility','hidden');
-   svg.appendChild(marker);resetMarker();
-   status.textContent='Cursor visual preparado · '+targets.length+' cabezas de nota detectadas';
-  }catch(err){status.textContent='Error: '+err.message;console.error(err)}
+   await osmd.load(xml);osmd.render();svg=target.querySelector('svg');if(!svg)throw Error('El visor no ha generado la partitura.');
+   const all=Array.from(svg.querySelectorAll('.vf-notehead')).length?Array.from(svg.querySelectorAll('.vf-notehead')):Array.from(svg.querySelectorAll('[class*="notehead"]'));
+   if(all.length!==76)throw Error('Se esperaban 76 cabezas de nota y se han detectado '+all.length+'.');
+   voices=[all.slice(0,37),all.slice(37,76)];
+   if(times[0].length!==37||times[1].length!==39)throw Error('Los tiempos MIDI no coinciden con las voces: '+times[0].length+' y '+times[1].length+'.');
+   for(let v=0;v<2;v++){const line=document.createElementNS(ns,'line');line.setAttribute('stroke',v===0?'#16a34a':'#2563eb');line.setAttribute('stroke-width','3.5');line.setAttribute('stroke-linecap','round');line.setAttribute('pointer-events','none');line.setAttribute('visibility','hidden');svg.appendChild(line);lines.push(line)}
+   ready=true;reset();status.textContent='Dos cursores preparados · Voz 1: 37 notas · Voz 2: 39 notas';
+  }catch(e){ready=false;status.textContent='Error: '+e.message;console.error(e)}
  }
  function control(type,seconds=0){
-  if(!targets.length)return;
-  if(type==='PROMENADE_CURSOR_RESET'){resetMarker();return}
+  if(!ready)return;
+  if(type==='PROMENADE_CURSOR_RESET'){reset();return}
   if(type==='PROMENADE_CURSOR_TIME'){
-   const idx=Math.floor(Math.max(0,Number(seconds)||0)/0.28);
-   setMarker(idx);
+   const t=Math.max(0,Number(seconds)||0);
+   for(let v=0;v<2;v++){let i=0;while(i+1<times[v].length&&times[v][i+1]<=t)i++;setVoice(v,i)}
   }
  }
  window.promenaCursorControl=control;
  window.addEventListener('message',e=>{const d=e.data;if(d&&d.type)control(d.type,d.seconds||0)});
- document.getElementById('testStep').addEventListener('click',()=>{if(!targets.length){status.textContent='No hay notas detectadas';return}setMarker(step+1)});
+ document.getElementById('testStep').addEventListener('click',()=>{if(!ready){status.textContent='Los dos cursores aún no están preparados';return}setVoice(0,steps[0]+1);setVoice(1,steps[1]+1)});
  document.getElementById('reload').addEventListener('click',render);
  await render();
 })();
