@@ -18,7 +18,7 @@
 <button id="stopPromenade">⏹ Detener</button>
 </div>
 <p id="playerStatus" class="muted" style="margin-top:16px">Selecciona una parte y pulsa Reproducir.</p>
-<p class="muted" style="font-size:12px">Conversión automática de Audiveris: conviene revisar las notas con la partitura original.</p>
+<p class="muted" style="font-size:12px">El reproductor está preparado. Falta incorporar los MIDI originales exportados de Audiveris para reproducir las notas correctas.</p>
 </div>
 </section></main><script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -80,7 +80,7 @@ let ToneLib, MidiLib, playerSynth, midiParts={};
 let selectedVoice='1';
 async function preparePromenade(){
  if(midiParts['1']&&midiParts['2'])return;
- $('playerStatus').textContent='Cargando las dos partes de Promenade...';
+ $('playerStatus').textContent='Preparando reproductor...';
  try{
   const [toneModule,midiModule]=await Promise.all([
    import('https://cdn.jsdelivr.net/npm/tone@15.1.22/+esm'),
@@ -90,14 +90,14 @@ async function preparePromenade(){
   const paths={1:'./assets/promenade_parte_1.mid.b64',2:'./assets/promenade_parte_2.mid.b64'};
   for(const part of ['1','2']){
    const response=await fetch(paths[part]);
-   if(!response.ok)throw new Error('No se ha podido cargar la parte '+part);
+   if(!response.ok)throw new Error('Falta el archivo MIDI original de la parte '+part);
    const encoded=(await response.text()).trim();
    const raw=atob(encoded),bytes=new Uint8Array(raw.length);
    for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
    midiParts[part]=new MidiLib(bytes);
   }
   playerSynth=new ToneLib.PolySynth(ToneLib.Synth,{oscillator:{type:'triangle'},envelope:{attack:0.01,decay:0.12,sustain:0.35,release:0.8}}).toDestination();
-  $('playerStatus').textContent='Promenade está lista. Elige Parte 1, Parte 2 o las dos.';
+  $('playerStatus').textContent='El reproductor está listo para recibir los dos MIDI originales.';
  }catch(error){$('playerStatus').textContent='Error al cargar el reproductor: '+error.message}
 }
 function clearPromenade(){if(!ToneLib)return;ToneLib.Transport.stop();ToneLib.Transport.cancel();if(playerSynth)playerSynth.releaseAll()}
