@@ -35,6 +35,20 @@ main{max-width:1050px;margin:25px auto;padding:0 18px}.panel{background:white;bo
 <div id="score" style="overflow:auto"></div>
 </section>
 <section class="panel">
+<h2>🎹 Reproducir la partitura</h2>
+<p class="muted">Cuando cargues un MusicXML, podrás escuchar las dos manos juntas o cada pentagrama por separado.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0">
+<button type="button" id="playBoth">▶ Las dos manos</button>
+<button type="button" id="playRight">▶ Mano derecha</button>
+<button type="button" id="playLeft">▶ Mano izquierda</button>
+<button type="button" id="stopMusic" style="background:#e8eaf0;color:#253047">⏹ Detener</button>
+</div>
+<label for="musicTempo"><b>Velocidad: <span id="musicTempoValue">100%</span></b></label>
+<input id="musicTempo" type="range" min="50" max="150" value="100" style="width:100%;max-width:420px">
+<p id="musicStatus" class="muted">Carga un MusicXML para preparar la reproducción.</p>
+<p class="muted" style="font-size:13px">Este primer reproductor utiliza un sonido electrónico sencillo del navegador. Después podremos incorporar un sonido de piano más realista.</p>
+</section>
+<section class="panel">
 <h2>¿Qué hará el reconocimiento automático?</h2>
 <p class="muted">El siguiente paso será convertir las notas de una fotografía o PDF en una partitura editable (MusicXML). Esta primera versión prepara la carga y la vista previa; todavía no reconoce notas automáticamente ni genera MIDI desde imágenes o PDF.</p>
 <div class="notice">Importante: para reconocer notas en imágenes y PDF hace falta conectar un motor OMR. La aplicación está alojada en GitHub Pages, así que ese procesamiento necesitará un servicio compatible. No se modificará el reproductor actual.</div>
@@ -47,9 +61,82 @@ function clearPreview(){if(currentUrl){URL.revokeObjectURL(currentUrl);currentUr
 function setStatus(message){byId('status').textContent=message}
 function showImage(file){clearPreview();currentUrl=URL.createObjectURL(file);const img=document.createElement('img');img.src=currentUrl;img.alt='Vista previa de '+file.name;byId('preview').appendChild(img);setStatus('Fotografía cargada: '+file.name+'. Puedes revisar la imagen. El reconocimiento de notas se incorporará en una fase posterior.')}
 function showPdf(file){clearPreview();currentUrl=URL.createObjectURL(file);const frame=document.createElement('iframe');frame.src=currentUrl;frame.title='Vista previa del PDF';byId('preview').appendChild(frame);setStatus('PDF cargado: '+file.name+'. Puedes revisar sus páginas. El reconocimiento de notas se incorporará en una fase posterior.')}
-async function showXml(file){clearPreview();setStatus('Leyendo MusicXML...');try{const xml=await file.text();if(!xml.includes('<score-partwise')&&!xml.includes('<score-timewise'))throw new Error('El archivo no parece ser un MusicXML válido.');const lib=window.opensheetmusicdisplay;if(!lib)throw new Error('No se ha podido cargar el visor de partituras. Comprueba tu conexión.');const osmd=new lib.OpenSheetMusicDisplay(byId('score'),{autoResize:true,backend:'svg',drawTitle:true,drawPartNames:true});await osmd.load(xml);osmd.render();setStatus('MusicXML cargado correctamente: '+file.name+'. Ya puedes ver la partitura.');}catch(e){setStatus('No se pudo abrir el MusicXML: '+e.message)}}
+async function showXml(file){clearPreview();setStatus('Leyendo MusicXML...');try{const xml=await file.text();if(!xml.includes('<score-partwise')&&!xml.includes('<score-timewise'))throw new Error('El archivo no parece ser un MusicXML válido.');const lib=window.opensheetmusicdisplay;if(!lib)throw new Error('No se ha podido cargar el visor de partituras. Comprueba tu conexión.');const osmd=new lib.OpenSheetMusicDisplay(byId('score'),{autoResize:true,backend:'svg',drawTitle:true,drawPartNames:true});await osmd.load(xml);osmd.render();musicEvents=parseMusicXml(xml);byId('musicStatus').textContent='Partitura preparada: '+musicEvents.length+' notas detectadas.';setStatus('MusicXML cargado correctamente: '+file.name+'. Ya puedes ver y reproducir la partitura.');}catch(e){setStatus('No se pudo abrir el MusicXML: '+e.message)}}
 byId('imageFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)showImage(f)});
 byId('pdfFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)showPdf(f)});
 byId('xmlFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)showXml(f)});
+
+let musicEvents=[];
+let audioCtx=null, activeNodes=[];
+function pitchMidi(note){
+ const step=note.querySelector('pitch step')?.textContent;
+ const octave=Number(note.querySelector('pitch octave')?.textContent);
+ if(!step||!Number.isFinite(octave))return null;
+ const semis={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+ let alter=Number(note.querySelector('pitch alter')?.textContent||0);
+ const keyFifths=Number(note.closest('measure')?.querySelector('attributes key fifths')?.textContent||0);
+ const orderSharp=['F','C','G','D','A','E','B'],orderFlat=['B','E','A','D','G','C','F'];
+ if(!note.querySelector('accidental')){
+  if(keyFifths>0&&orderSharp.slice(0,keyFifths).includes(step))alter+=1;
+  if(keyFifths<0&&orderFlat.slice(0,Math.abs(keyFifths)).includes(step))alter-=1;
+ }
+ return (octave+1)*12+semis[step]+alter;
+}
+function parseMusicXml(xml){
+ const doc=new DOMParser().parseFromString(xml,'application/xml');
+ if(doc.querySelector('parsererror'))throw Error('MusicXML no válido');
+ const part=doc.querySelector('score-partwise > part');
+ if(!part)throw Error('No se encuentra ninguna parte musical');
+ let divisions=1,measureBase=0,events=[];
+ for(const measure of [...part.children].filter(x=>x.tagName==='measure')){
+  divisions=Number(measure.querySelector(':scope > attributes > divisions')?.textContent||divisions);
+  let cursor=0,maxCursor=0,lastStart=null;
+  for(const el of [...measure.children]){
+   if(el.tagName==='backup'){cursor=Math.max(0,cursor-Number(el.querySelector('duration')?.textContent||0));continue}
+   if(el.tagName==='forward'){cursor+=Number(el.querySelector('duration')?.textContent||0);maxCursor=Math.max(maxCursor,cursor);continue}
+   if(el.tagName!=='note')continue;
+   const dur=Number(el.querySelector('duration')?.textContent||0);
+   const chord=!!el.querySelector('chord');
+   if(!chord)lastStart=cursor;
+   const start=chord&&lastStart!==null?lastStart:cursor;
+   const midi=pitchMidi(el),staff=Number(el.querySelector('staff')?.textContent||1);
+   if(midi!==null&&!el.querySelector('rest'))events.push({midi,staff,start:measureBase+start/divisions,duration:dur/divisions});
+   if(!chord)cursor+=dur;
+   maxCursor=Math.max(maxCursor,cursor);
+  }
+  measureBase+=maxCursor/divisions;
+ }
+ return events;
+}
+function stopMusic(){
+ activeNodes.forEach(n=>{try{n.stop()}catch(e){}});
+ activeNodes=[];
+ if(audioCtx){audioCtx.close();audioCtx=null}
+ byId('musicStatus').textContent='Reproducción detenida.';
+}
+function playMusic(which){
+ if(!musicEvents.length){byId('musicStatus').textContent='Primero carga un archivo MusicXML.';return}
+ stopMusic();
+ audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ const speed=Number(byId('musicTempo').value)/100;
+ const selected=musicEvents.filter(n=>which==='both'||(which==='right'?n.staff===1:n.staff===2));
+ if(!selected.length){byId('musicStatus').textContent='No se encontraron notas en ese pentagrama.';return}
+ const start=audioCtx.currentTime+0.12;
+ for(const n of selected){
+  const at=start+n.start*0.5/speed,dur=Math.max(0.09,n.duration*0.5/speed);
+  const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+  osc.type='triangle';osc.frequency.value=440*Math.pow(2,(n.midi-69)/12);
+  gain.gain.setValueAtTime(0.0001,at);gain.gain.exponentialRampToValueAtTime(0.16,at+0.015);gain.gain.setTargetAtTime(0.0001,at+Math.max(0.03,dur-0.04),0.035);
+  osc.connect(gain);gain.connect(audioCtx.destination);osc.start(at);osc.stop(at+dur+0.12);activeNodes.push(osc);
+ }
+ const end=Math.max(...selected.map(n=>n.start+n.duration))*0.5/speed;
+ byId('musicStatus').textContent='Reproduciendo '+(which==='both'?'las dos manos':which==='right'?'la mano derecha':'la mano izquierda')+'.';
+ setTimeout(()=>{if(audioCtx)byId('musicStatus').textContent='Reproducción finalizada.'},(end+0.3)*1000);
+}
+byId('playBoth').addEventListener('click',()=>playMusic('both'));
+byId('playRight').addEventListener('click',()=>playMusic('right'));
+byId('playLeft').addEventListener('click',()=>playMusic('left'));
+byId('stopMusic').addEventListener('click',stopMusic);
+byId('musicTempo').addEventListener('input',e=>byId('musicTempoValue').textContent=e.target.value+'%');
 </script>
 </body></html>
