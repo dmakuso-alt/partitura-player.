@@ -106,7 +106,7 @@ async function preparePlayer(){
 }
 $('loadMainSf2').addEventListener('click',async()=>{try{const file=$('mainSf2File').files[0];if(!file)throw Error('Selecciona bassoon.sf2.');$('loadMainSf2').disabled=true;$('playerStatus').textContent='Cargando sonido de fagot...';const buf=await file.arrayBuffer();const savedBuf=buf.slice(0);await initFagot(buf);await dbPut(savedBuf);await loadMidis();$('playerStatus').textContent='¡Fagot cargado y guardado en este navegador!'}catch(e){$('playerStatus').textContent='Error: '+e.message;$('loadMainSf2').disabled=false;console.error(e)}});
 let cursorTimer=null,cursorStartedAt=0,cursorSpeed=1;
-function sendCursor(type,seconds=0){const frame=$('scoreFrame');if(frame&&frame.contentWindow)frame.contentWindow.postMessage({type,seconds},'*')}
+function sendCursor(type,seconds=0){const frame=$('scoreFrame');try{const w=frame&&frame.contentWindow;if(w&&typeof w.promenaCursorControl==='function'){w.promenaCursorControl(type,seconds);return}}catch(e){}if(frame&&frame.contentWindow)frame.contentWindow.postMessage({type,seconds},'*')}
 function stopCursor(reset=true){if(cursorTimer!==null){clearInterval(cursorTimer);cursorTimer=null}if(reset)sendCursor('PROMENADE_CURSOR_RESET')}
 function startCursor(speed){stopCursor(false);cursorSpeed=speed;cursorStartedAt=performance.now();sendCursor('PROMENADE_CURSOR_RESET');cursorTimer=setInterval(()=>{const seconds=Math.max(0,(performance.now()-cursorStartedAt-100)/1000)*cursorSpeed;sendCursor('PROMENADE_CURSOR_TIME',seconds)},50)}
 function stopPlayer(){timers.forEach(clearTimeout);timers=[];stopCursor();if(synth)synth.stopAll(true)}
