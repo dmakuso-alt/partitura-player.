@@ -22,7 +22,7 @@ button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff
  function vlq(a,p){let v=0,b;do{b=a[p++];v=(v<<7)|(b&127)}while(b&128);return [v,p]}
  function decode64(s){const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',out=[];let acc=0,bits=0;for(const c of s){if(c==='=')break;acc=(acc<<6)|chars.indexOf(c);bits+=6;if(bits>=8){bits-=8;out.push((acc>>bits)&255)}}return out}
  function parseMidi(b64){
-  const a=decode64(b64);let p=14,tick=0,running=0,tempo=500000,events=[],active=new Map(),tempos=[];
+  const a=decode64(b64);let p=22,tick=0,running=0,tempo=500000,events=[],active=new Map(),tempos=[]; // skip MThd (14 bytes) and MTrk header (8 bytes)
   while(p<a.length){
    let z=vlq(a,p);tick+=z[0];p=z[1];let st=a[p++];
    if(st<128){p--;st=running}else if(st<240)running=st;
