@@ -64,7 +64,22 @@ button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff
    await osmd.load(xml);osmd.render();svg=target.querySelector('svg');if(!svg)throw Error('El visor no ha generado la partitura.');
    const all=Array.from(svg.querySelectorAll('.vf-notehead')).length?Array.from(svg.querySelectorAll('.vf-notehead')):Array.from(svg.querySelectorAll('[class*="notehead"]'));
    if(all.length!==76)throw Error('Se esperaban 76 cabezas de nota y se han detectado '+all.length+'.');
-   voices=[all.slice(0,37),all.slice(37,76)];
+   // OSMD orders SVG elements system-by-system. Group noteheads into staff rows,
+   // then collect upper and lower staff rows separately in reading order.
+   const measured=all.map(el=>{const b=el.getBBox();return {el,x:b.x+b.width/2,y:b.y+b.height/2}});
+   const sortedY=measured.slice().sort((a,b)=>a.y-b.y);
+   const rows=[];
+   for(const item of sortedY){
+    let row=rows.find(r=>Math.abs(r.center-item.y)<48);
+    if(!row){row={center:item.y,items:[]};rows.push(row)}
+    row.items.push(item);row.center=row.items.reduce((s,q)=>s+q.y,0)/row.items.length;
+   }
+   rows.sort((a,b)=>a.center-b.center);
+   if(rows.length<4||rows.length%2!==0)throw Error('No he podido separar los pentagramas: '+rows.length+' filas detectadas.');
+   const upper=[],lower=[];
+   rows.forEach((row,i)=>{row.items.sort((a,b)=>a.x-b.x);(i%2===0?upper:lower).push(...row.items.map(q=>q.el))});
+   if(upper.length!==37||lower.length!==39)throw Error('Separación de voces incorrecta: pentagrama superior '+upper.length+' notas e inferior '+lower.length+'.');
+   voices=[upper,lower];
    if(times[0].length!==37||times[1].length!==39)throw Error('Los tiempos MIDI no coinciden con las voces: '+times[0].length+' y '+times[1].length+'.');
    for(let v=0;v<2;v++){const line=document.createElementNS(ns,'line');line.setAttribute('stroke',v===0?'#16a34a':'#2563eb');line.setAttribute('stroke-width','3.5');line.setAttribute('stroke-linecap','round');line.setAttribute('pointer-events','none');line.setAttribute('visibility','hidden');svg.appendChild(line);lines.push(line)}
    ready=true;reset();status.textContent='Dos cursores preparados · Voz 1: 37 notas · Voz 2: 39 notas';
