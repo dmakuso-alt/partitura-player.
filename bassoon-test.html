@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prueba de fagot - Partitura Player</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f3fb;color:#26233a;margin:0;padding:24px}main{max-width:680px;margin:auto;background:white;padding:26px;border-radius:18px;box-shadow:0 8px 30px #24154a18}h1{color:#6849bd}button,input,select{font:inherit;padding:11px;border-radius:9px;border:1px solid #d7d2e8;margin:5px 3px}button{background:#6849bd;color:white;border:0;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.muted{color:#686477}#status{padding:12px;background:#f2effb;border-radius:10px;margin-top:16px;min-height:22px}.row{margin:15px 0}
+</style></head><body><main>
+<h1>🎼 Prueba de sonido de fagot</h1>
+<p>Esta es una prueba independiente. No modifica el reproductor principal.</p>
+<div class="row"><b>1. Selecciona el banco de sonido:</b><br><input id="sf2file" type="file" accept=".sf2,application/octet-stream"></div>
+<div class="row"><b>2. Elige qué escuchar:</b><br><select id="part"><option value="1">Parte 1</option><option value="2">Parte 2</option><option value="both">Las dos partes</option></select>
+<label>Velocidad <span id="speedLabel">100%</span></label><br><input id="speed" type="range" min="50" max="140" value="100"></div>
+<div class="row"><button id="load">Cargar fagot</button><button id="play" disabled>▶ Reproducir</button><button id="stop" disabled>⏹ Detener</button></div>
+<div id="status">Selecciona bassoon.sf2 y pulsa «Cargar fagot».</div>
+<p class="muted">El banco contiene un preset propio de fagot (programa 0). Si la prueba suena correctamente, lo integraremos en el reproductor principal.</p>
+</main>
+<script type="module">
+import { WorkletSynthesizer } from 'https://cdn.jsdelivr.net/npm/spessasynth_lib@4.4.8/+esm';
+import { Midi } from 'https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/+esm';
+const $=id=>document.getElementById(id);
+let ctx,synth,midis={},timers=[],loaded=false;
+$('speed').addEventListener('input',()=> $('speedLabel').textContent=$('speed').value+'%');
+async function loadMidi(n){
+ const url='./assets/promenade_parte_'+n+'.mid.b64';
+ let r=await fetch(url); if(!r.ok)r=await fetch('https://raw.githubusercontent.com/dmakuso-alt/partitura-player./main/assets/promenade_parte_'+n+'.mid.b64');
+ if(!r.ok)throw new Error('No se pudo descargar la parte '+n);
+ const raw=atob((await r.text()).trim()),bytes=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+ midis[n]=new Midi(bytes.buffer);
+}
+$('load').addEventListener('click',async()=>{
+ try{
+  const file=$('sf2file').files[0];if(!file)throw new Error('Primero selecciona bassoon.sf2.');
+  $('status').textContent='Cargando motor y banco de fagot… puede tardar unos segundos.';
+  $('load').disabled=true;
+  const context=new AudioContext();
+  await context.audioWorklet.addModule('https://cdn.jsdelivr.net/npm/spessasynth_lib@4.4.8/dist/spessasynth_processor.min.js');
+  const engine=new WorkletSynthesizer(context);engine.connect(context.destination);
+  await engine.soundBankManager.addSoundBank(await file.arrayBuffer(),'Fagot Ethan Winer');
+  await engine.isReady;
+  ctx=context;synth=engine;
+  synth.programChange(0,0);
+  await Promise.all([loadMidi(1),loadMidi(2)]);
+  loaded=true;$('play').disabled=false;$('stop').disabled=false;
+  $('status').textContent='¡Fagot cargado! Preset: '+(synth.presetList?.map(p=>p.name).join(', ')||'programa 0')+'. Ya puedes reproducir.';
+ }catch(e){$('status').textContent='Error: '+e.message;$('load').disabled=false;console.error(e)}
+});
+function stop(){timers.forEach(clearTimeout);timers=[];if(synth)synth.stopAll(true)}
+$('stop').addEventListener('click',()=>{stop();$('status').textContent='Reproducción detenida.'});
+$('play').addEventListener('click',async()=>{
+ if(!loaded)return;stop();await ctx.resume();
+ const choice=$('part').value,parts=choice==='both'?['1','2']:[choice],speed=Number($('speed').value)/100;
+ parts.forEach(p=>midis[p].tracks.forEach(t=>t.notes.forEach(note=>{
+  const start=note.time/speed*1000,duration=note.duration/speed*1000;
+  timers.push(setTimeout(()=>synth.noteOn(0,note.midi,Math.max(1,Math.round((note.velocity||.8)*127))),start));
+  timers.push(setTimeout(()=>synth.noteOff(0,note.midi),start+duration));
+ })));
+ $('status').textContent='Reproduciendo '+(choice==='both'?'las dos partes':'parte '+choice)+' con SoundFont de fagot.';
+});
+</script></body></html>
