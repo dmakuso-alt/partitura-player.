@@ -104,7 +104,7 @@ async function preparePlayer(){
  await loadMidis();
  if(!soundReady){const saved=await dbGet();if(saved)await initFagot(saved)}
 }
-$('loadMainSf2').addEventListener('click',async()=>{try{const file=$('mainSf2File').files[0];if(!file)throw Error('Selecciona bassoon.sf2.');$('loadMainSf2').disabled=true;$('playerStatus').textContent='Cargando sonido de fagot...';const buf=await file.arrayBuffer();await initFagot(buf);await dbPut(buf);await loadMidis();$('playerStatus').textContent='¡Fagot cargado y guardado en este navegador!'}catch(e){$('playerStatus').textContent='Error: '+e.message;$('loadMainSf2').disabled=false;console.error(e)}});
+$('loadMainSf2').addEventListener('click',async()=>{try{const file=$('mainSf2File').files[0];if(!file)throw Error('Selecciona bassoon.sf2.');$('loadMainSf2').disabled=true;$('playerStatus').textContent='Cargando sonido de fagot...';const buf=await file.arrayBuffer();const savedBuf=buf.slice(0);await initFagot(buf);await dbPut(savedBuf);await loadMidis();$('playerStatus').textContent='¡Fagot cargado y guardado en este navegador!'}catch(e){$('playerStatus').textContent='Error: '+e.message;$('loadMainSf2').disabled=false;console.error(e)}});
 function stopPlayer(){timers.forEach(clearTimeout);timers=[];if(synth)synth.stopAll(true)}
 function playSelected(){
  stopPlayer();const parts=selectedVoice==='both'?['1','2']:[selectedVoice],speed=Number($('tempo').value)/100;
