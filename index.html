@@ -33,7 +33,7 @@ window.addStudent=async function(e){
  const nombre=$('studentName').value.trim(),instrumento=$('studentInstrument').value;
  if(!instrumento){$('studentMsg').textContent='Selecciona un instrumento';return}
  const {data:{user}}=await supabase.auth.getUser();
- const {error}=await supabase.from('students').insert({name:nombre,instrument:instrumento,teacher_id:user.id});
+ const {error}=await supabase.from('students').insert({name:nombre,instrument:instrumento,teacher_id:user.id,user_id:user.id});
  if(error){$('studentMsg').textContent='❌ '+error.message;return}
  $('studentName').value='';$('studentInstrument').value='';$('studentMsg').textContent='✅ Alumno añadido correctamente';loadStudents();
 };
