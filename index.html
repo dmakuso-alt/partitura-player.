@@ -76,17 +76,21 @@ async function loadStudents(){
 
 
 /* Reproductor MIDI de Promenade */
-let ToneLib, MidiLib, playerSynth, midiParts={};
+let ToneLib, MidiLib, playerSoundfont, midiParts={};
 let selectedVoice='1';
 async function preparePromenade(){
  if(midiParts['1']&&midiParts['2'])return;
  $('playerStatus').textContent='Preparando reproductor...';
  try{
-  const [toneModule,midiModule]=await Promise.all([
+  const [toneModule,midiModule,soundfontModule]=await Promise.all([
    import('https://cdn.jsdelivr.net/npm/tone@15.1.22/+esm'),
-   import('https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/+esm')
+   import('https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/+esm'),
+   import('https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/+esm')
   ]);
   ToneLib=toneModule;MidiLib=midiModule.Midi;
+  const Soundfont=soundfontModule.default||soundfontModule;
+  const audioContext=ToneLib.getContext().rawContext;
+  playerSoundfont=await Soundfont.instrument(audioContext,'bassoon',{soundfont:'FluidR3_GM',gain:0.9});
   const paths={1:'./assets/promenade_parte_1.mid.b64',2:'./assets/promenade_parte_2.mid.b64'};
   for(const part of ['1','2']){
    let response=await fetch(paths[part]);
@@ -104,14 +108,14 @@ async function preparePromenade(){
   $('playerStatus').textContent='El reproductor está listo para recibir los dos MIDI originales.';
  }catch(error){$('playerStatus').textContent='Error al cargar el reproductor: '+error.message}
 }
-function clearPromenade(){if(!ToneLib)return;ToneLib.Transport.stop();ToneLib.Transport.cancel();if(playerSynth)playerSynth.releaseAll()}
+function clearPromenade(){if(!ToneLib)return;ToneLib.Transport.stop();ToneLib.Transport.cancel();if(playerSoundfont)playerSoundfont.stop()}
 function schedulePromenade(){
  clearPromenade();
  const chosen=selectedVoice==='both'?['1','2']:[selectedVoice];
  const speed=Number($('tempo').value)/100;
  chosen.forEach(part=>midiParts[part].tracks.forEach(track=>track.notes.forEach(note=>{
   const at=note.time/speed,dur=Math.max(.08,note.duration/speed);
-  ToneLib.Transport.schedule(time=>playerSynth.triggerAttackRelease(note.name,dur,time,note.velocity||0.8),at);
+  ToneLib.Transport.schedule(time=>playerSoundfont.play(note.midi,time,{duration:dur,gain:note.velocity||0.8}),at);
  })));
 }
 document.querySelectorAll('[data-voice]').forEach(button=>button.addEventListener('click',()=>{
