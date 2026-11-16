@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#6b4fc8"><title>Lector de partituras · Partitura Player</title>
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.2/build/opensheetmusicdisplay.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6fb;color:#253047;font-family:Arial,sans-serif}
+header{background:#fff;padding:15px max(18px,calc((100% - 1050px)/2));box-shadow:0 2px 12px #0001;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand,h1{color:#6b4fc8}button,.pick{border:0;border-radius:10px;padding:11px 15px;font:inherit;font-weight:bold;cursor:pointer;background:#6b4fc8;color:white;text-decoration:none;display:inline-block}
+main{max-width:1050px;margin:25px auto;padding:0 18px}.panel{background:white;border-radius:18px;padding:22px;box-shadow:0 8px 25px #0000000d;margin-bottom:18px}
+.muted{color:#6d7787;line-height:1.5}.uploadgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.upload{border:1px dashed #c9c2df;border-radius:14px;padding:17px;background:#faf9fd}.upload input{display:block;margin-top:12px;max-width:100%}
+#preview{min-height:110px;overflow:auto}#preview img{max-width:100%;height:auto;display:block;margin:auto}#preview iframe{width:100%;height:650px;border:0}
+#score{overflow:auto}#status{font-size:14px;color:#596579;margin-top:12px}
+.notice{background:#fff8e8;border-left:4px solid #e5a323;padding:13px 15px;border-radius:8px;line-height:1.5}
+@media(max-width:700px){.uploadgrid{grid-template-columns:1fr}header{align-items:flex-start}}
+</style>
+</head>
+<body>
+<header><div class="brand">🎼 Partitura Player · Lector</div><button onclick="location.href='./index.html'">← Volver a la aplicación</button></header>
+<main>
+<section class="panel">
+<h1>📷 Lector de partituras</h1>
+<p class="muted">Carga una fotografía, un PDF o un archivo MusicXML. Primero podrás visualizar el documento y comprobar que es el correcto.</p>
+<div class="uploadgrid">
+<div class="upload"><b>📷 Fotografía</b><p class="muted">JPG, PNG o WEBP</p><input id="imageFile" type="file" accept="image/jpeg,image/png,image/webp"></div>
+<div class="upload"><b>📄 Documento PDF</b><p class="muted">Partitura escaneada o digital</p><input id="pdfFile" type="file" accept="application/pdf"></div>
+<div class="upload"><b>🎼 MusicXML</b><p class="muted">Archivo XML de partitura</p><input id="xmlFile" type="file" accept=".xml,.musicxml,application/xml,text/xml"></div>
+</div>
+<p id="status" role="status">Selecciona un archivo para empezar.</p>
+</section>
+<section class="panel">
+<h2>Vista previa</h2>
+<div id="preview" class="muted">Aquí aparecerá el archivo seleccionado.</div>
+<div id="score" style="overflow:auto"></div>
+</section>
+<section class="panel">
+<h2>¿Qué hará el reconocimiento automático?</h2>
+<p class="muted">El siguiente paso será convertir las notas de una fotografía o PDF en una partitura editable (MusicXML). Esta primera versión prepara la carga y la vista previa; todavía no reconoce notas automáticamente ni genera MIDI desde imágenes o PDF.</p>
+<div class="notice">Importante: para reconocer notas en imágenes y PDF hace falta conectar un motor OMR. La aplicación está alojada en GitHub Pages, así que ese procesamiento necesitará un servicio compatible. No se modificará el reproductor actual.</div>
+</section>
+</main>
+<script>
+const byId=id=>document.getElementById(id);
+let currentUrl=null;
+function clearPreview(){if(currentUrl){URL.revokeObjectURL(currentUrl);currentUrl=null}byId('preview').replaceChildren();byId('score').replaceChildren()}
+function setStatus(message){byId('status').textContent=message}
+function showImage(file){clearPreview();currentUrl=URL.createObjectURL(file);const img=document.createElement('img');img.src=currentUrl;img.alt='Vista previa de '+file.name;byId('preview').appendChild(img);setStatus('Fotografía cargada: '+file.name+'. Puedes revisar la imagen. El reconocimiento de notas se incorporará en una fase posterior.')}
+function showPdf(file){clearPreview();currentUrl=URL.createObjectURL(file);const frame=document.createElement('iframe');frame.src=currentUrl;frame.title='Vista previa del PDF';byId('preview').appendChild(frame);setStatus('PDF cargado: '+file.name+'. Puedes revisar sus páginas. El reconocimiento de notas se incorporará en una fase posterior.')}
+async function showXml(file){clearPreview();setStatus('Leyendo MusicXML...');try{const xml=await file.text();if(!xml.includes('<score-partwise')&&!xml.includes('<score-timewise'))throw new Error('El archivo no parece ser un MusicXML válido.');const lib=window.opensheetmusicdisplay;if(!lib)throw new Error('No se ha podido cargar el visor de partituras. Comprueba tu conexión.');const osmd=new lib.OpenSheetMusicDisplay(byId('score'),{autoResize:true,backend:'svg',drawTitle:true,drawPartNames:true});await osmd.load(xml);osmd.render();setStatus('MusicXML cargado correctamente: '+file.name+'. Ya puedes ver la partitura.');}catch(e){setStatus('No se pudo abrir el MusicXML: '+e.message)}}
+byId('imageFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)showImage(f)});
+byId('pdfFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)showPdf(f)});
+byId('xmlFile').addEventListener('change',e=>{const f=e.target.files[0];if(f)showXml(f)});
+</script>
+</body></html>
