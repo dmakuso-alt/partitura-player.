@@ -37,9 +37,15 @@ button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff
   return events.sort((x,y)=>x.start-y.start).map(e=>toSeconds(e.start));
  }
  function drawLine(line,el,color){
+  // Place each cursor in the exact SVG group that owns the current note.
+  // This preserves the system/group transforms used by OSMD on multi-system scores.
+  const parent=el.parentNode;
+  if(parent&&line.parentNode!==parent)parent.appendChild(line);
   const b=el.getBBox(),x=b.x+b.width/2,y=b.y+b.height/2;
   line.setAttribute('x1',x);line.setAttribute('x2',x);
-  line.setAttribute('y1',Math.max(0,y-35));line.setAttribute('y2',y+35);line.setAttribute('visibility','visible');
+  line.setAttribute('y1',y-35);line.setAttribute('y2',y+35);
+  line.setAttribute('stroke',color);line.setAttribute('stroke-width','4');
+  line.setAttribute('stroke-linecap','round');line.setAttribute('visibility','visible');
  }
  function setVoice(v,index){if(!voices[v].length)return;steps[v]=Math.max(0,Math.min(index,voices[v].length-1));drawLine(lines[v],voices[v][steps[v]],v===0?'#16a34a':'#2563eb')}
  function reset(){setVoice(0,0);setVoice(1,0)}
