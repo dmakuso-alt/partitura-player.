@@ -29,12 +29,15 @@ button{padding:9px 14px;border:0;border-radius:9px;background:#6b4fc8;color:#fff
    const response=await fetch('./assets/promenade.musicxml',{cache:'no-store'});
    if(!response.ok)throw new Error('No se encuentra el archivo MusicXML ('+response.status+').');
    const musicxml=await response.text();
-   const osmd=new lib.OpenSheetMusicDisplay(target,{autoResize:true,backend:'svg',drawTitle:true,drawPartNames:true,followCursor:false});
+   const osmd=new lib.OpenSheetMusicDisplay(target,{autoResize:true,backend:'svg',drawTitle:true,drawPartNames:true,followCursor:true});
    await osmd.load(musicxml);
    osmd.render();
-   status.textContent='Partitura de Promenade cargada correctamente · 2 voces';
+   osmd.cursor.show();osmd.cursor.reset();
+   window.promScoreCursor=osmd.cursor;window.promScoreBpm=120;
+   status.textContent='Partitura de Promenade cargada correctamente · 2 voces · lista para seguir la música';
   }catch(err){status.textContent='Error: '+err.message;target.textContent='No se pudo mostrar la partitura.';console.error(err)}
  }
+ window.addEventListener('message',event=>{const d=event.data;if(!d||d.type!=='PROMENADE_CURSOR'||!window.promScoreCursor)return;try{if(d.reset){window.promScoreCursor.reset();window.promScoreCursor.show();return;}const targetWhole=(Number(d.seconds)||0)*window.promScoreBpm/60/4;let guard=0;while(window.promScoreCursor.iterator&&window.promScoreCursor.iterator.currentTimeStamp&&window.promScoreCursor.iterator.currentTimeStamp.RealValue<targetWhole&&guard++<500){window.promScoreCursor.next();}}catch(err){console.warn('Cursor de partitura:',err)}});
  document.getElementById('reload').addEventListener('click',render);
  await render();
 })();
