@@ -17,8 +17,9 @@
 <button id="pausePromenade">⏸ Pausar</button>
 <button id="stopPromenade">⏹ Detener</button>
 </div>
-<p id="playerStatus" class="muted" style="margin-top:16px">Selecciona una parte y pulsa Reproducir.</p>
-<p class="muted" style="font-size:12px">Los archivos MIDI de Promenade están incorporados. Pulsa Reproducir para escuchar la parte seleccionada.</p>
+<div style="margin-top:20px;padding:16px;background:#f5f2fc;border-radius:14px"><b>🎷 Sonido realista de fagot</b><p class="muted" style="font-size:13px">La primera vez, selecciona bassoon.sf2. Se guardará en este navegador.</p><input id="mainSf2File" type="file" accept=".sf2,application/octet-stream"><button id="loadMainSf2" type="button" class="primary">Cargar sonido de fagot</button></div>
+<p id="playerStatus" class="muted" style="margin-top:16px">Selecciona el banco de fagot para empezar.</p>
+<p class="muted" style="font-size:12px">El sonido se guarda en este navegador para no tener que seleccionarlo cada vez.</p>
 </div>
 </section></main><script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -75,63 +76,39 @@ async function loadStudents(){
 }
 
 
-/* Reproductor MIDI de Promenade */
-let ToneLib, MidiLib, playerSoundfont, midiParts={};
-let selectedVoice='1';
-async function preparePromenade(){
+/* Reproductor MIDI de Promenade con SoundFont realista */
+import { WorkletSynthesizer } from 'https://cdn.jsdelivr.net/npm/spessasynth_lib@4.4.8/+esm';
+let MidiLib,midiParts={},synth=null,audioContext=null,selectedVoice='1',soundReady=false,timers=[];
+const DB='partitura-player-audio',STORE='soundfonts';
+function dbOpen(){return new Promise((ok,no)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+async function dbPut(buf){const d=await dbOpen();return new Promise((ok,no)=>{const t=d.transaction(STORE,'readwrite');t.objectStore(STORE).put(buf,'ethan-bassoon');t.oncomplete=ok;t.onerror=()=>no(t.error)})}
+async function dbGet(){const d=await dbOpen();return new Promise((ok,no)=>{const r=d.transaction(STORE).objectStore(STORE).get('ethan-bassoon');r.onsuccess=()=>ok(r.result||null);r.onerror=()=>no(r.error)})}
+async function loadMidis(){
  if(midiParts['1']&&midiParts['2'])return;
- $('playerStatus').textContent='Preparando reproductor...';
- try{
-  const [toneModule,midiModule,soundfontModule]=await Promise.all([
-   import('https://cdn.jsdelivr.net/npm/tone@15.1.22/+esm'),
-   import('https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/+esm'),
-   import('https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/+esm')
-  ]);
-  ToneLib=toneModule;MidiLib=midiModule.Midi;
-  const Soundfont=soundfontModule.default||soundfontModule;
-  const audioContext=ToneLib.getContext().rawContext;
-  playerSoundfont=await Soundfont.instrument(audioContext,'bassoon',{soundfont:'FluidR3_GM',gain:0.9});
-  const paths={1:'./assets/promenade_parte_1.mid.b64',2:'./assets/promenade_parte_2.mid.b64'};
-  for(const part of ['1','2']){
-   let response=await fetch(paths[part]);
-   if(!response.ok){
-    const rawUrl='https://raw.githubusercontent.com/dmakuso-alt/partitura-player./main/assets/promenade_parte_'+part+'.mid.b64';
-    response=await fetch(rawUrl);
-   }
-   if(!response.ok)throw new Error('No se ha podido descargar el MIDI de la parte '+part+' (HTTP '+response.status+'). Recarga la página con Ctrl+F5.');
-   const encoded=(await response.text()).trim();
-   const raw=atob(encoded),bytes=new Uint8Array(raw.length);
-   for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-   midiParts[part]=new MidiLib(bytes.buffer);
-  }
-  playerSynth=new ToneLib.PolySynth(ToneLib.Synth,{oscillator:{type:'triangle'},envelope:{attack:0.01,decay:0.12,sustain:0.35,release:0.8}}).toDestination();
-  $('playerStatus').textContent='El reproductor está listo para recibir los dos MIDI originales.';
- }catch(error){$('playerStatus').textContent='Error al cargar el reproductor: '+error.message}
+ const m=await import('https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/+esm');MidiLib=m.Midi;
+ for(const p of ['1','2']){let r=await fetch('./assets/promenade_parte_'+p+'.mid.b64');if(!r.ok)r=await fetch('https://raw.githubusercontent.com/dmakuso-alt/partitura-player./main/assets/promenade_parte_'+p+'.mid.b64');if(!r.ok)throw Error('No se pudo cargar la parte '+p);const raw=atob((await r.text()).trim()),u=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)u[i]=raw.charCodeAt(i);midiParts[p]=new MidiLib(u.buffer)}
 }
-function clearPromenade(){if(!ToneLib)return;ToneLib.Transport.stop();ToneLib.Transport.cancel();if(playerSoundfont)playerSoundfont.stop()}
-function schedulePromenade(){
- clearPromenade();
- const chosen=selectedVoice==='both'?['1','2']:[selectedVoice];
- const speed=Number($('tempo').value)/100;
- chosen.forEach(part=>midiParts[part].tracks.forEach(track=>track.notes.forEach(note=>{
-  const at=note.time/speed,dur=Math.max(.08,note.duration/speed);
-  ToneLib.Transport.schedule(time=>playerSoundfont.play(note.midi,time,{duration:dur,gain:note.velocity||0.8}),at);
- })));
+async function initFagot(buf){
+ if(!audioContext)audioContext=new AudioContext();
+ await audioContext.audioWorklet.addModule('https://cdn.jsdelivr.net/npm/spessasynth_lib@4.4.8/dist/spessasynth_processor.min.js');
+ synth=new WorkletSynthesizer(audioContext);synth.connect(audioContext.destination);
+ await synth.soundBankManager.addSoundBank(buf,'Fagot Ethan Winer');await synth.isReady;synth.programChange(0,0);soundReady=true;
 }
-document.querySelectorAll('[data-voice]').forEach(button=>button.addEventListener('click',()=>{
- selectedVoice=button.dataset.voice;
- document.querySelectorAll('[data-voice]').forEach(b=>b.classList.toggle('primary',b===button));
- if(ToneLib&&midiParts['1']&&midiParts['2'])schedulePromenade();
- $('playerStatus').textContent='Seleccionado: '+(selectedVoice==='both'?'las dos partes':'parte '+selectedVoice)+'. Pulsa Reproducir.';
-}));
-$('tempo').addEventListener('input',e=>{$('tempoValue').textContent=e.target.value+'%';if(ToneLib&&midiParts['1']&&midiParts['2']&&ToneLib.Transport.state!=='started')schedulePromenade()});
-$('playPromenade').addEventListener('click',async()=>{
- await preparePromenade();if(!ToneLib||!midiParts['1'])return;
- await ToneLib.start();schedulePromenade();ToneLib.Transport.start();
- $('playerStatus').textContent='Reproduciendo '+(selectedVoice==='both'?'las dos partes':'la parte '+selectedVoice)+'.';
-});
-$('pausePromenade').addEventListener('click',()=>{if(ToneLib){ToneLib.Transport.pause();$('playerStatus').textContent='Reproducción pausada.'}});
-$('stopPromenade').addEventListener('click',()=>{clearPromenade();$('playerStatus').textContent='Reproducción detenida.'});
+async function preparePlayer(){
+ await loadMidis();
+ if(!soundReady){const saved=await dbGet();if(saved)await initFagot(saved)}
+}
+$('loadMainSf2').addEventListener('click',async()=>{try{const file=$('mainSf2File').files[0];if(!file)throw Error('Selecciona bassoon.sf2.');$('loadMainSf2').disabled=true;$('playerStatus').textContent='Cargando sonido de fagot...';const buf=await file.arrayBuffer();await initFagot(buf);await dbPut(buf);await loadMidis();$('playerStatus').textContent='¡Fagot cargado y guardado en este navegador!'}catch(e){$('playerStatus').textContent='Error: '+e.message;$('loadMainSf2').disabled=false;console.error(e)}});
+function stopPlayer(){timers.forEach(clearTimeout);timers=[];if(synth)synth.stopAll(true)}
+function playSelected(){
+ stopPlayer();const parts=selectedVoice==='both'?['1','2']:[selectedVoice],speed=Number($('tempo').value)/100;
+ for(const p of parts)midiParts[p].tracks.forEach(t=>t.notes.forEach(n=>{const at=100+n.time/speed*1000,d=Math.max(80,n.duration/speed*1000);timers.push(setTimeout(()=>synth.noteOn(0,n.midi,Math.max(1,Math.round((n.velocity||.8)*127))),at));timers.push(setTimeout(()=>synth.noteOff(0,n.midi),at+d))}));
+}
+document.querySelectorAll('[data-voice]').forEach(btn=>btn.addEventListener('click',()=>{selectedVoice=btn.dataset.voice;document.querySelectorAll('[data-voice]').forEach(x=>x.classList.toggle('primary',x===btn));$('playerStatus').textContent='Seleccionado: '+(selectedVoice==='both'?'las dos partes':'parte '+selectedVoice)+'.'}));
+$('tempo').addEventListener('input',e=>$('tempoValue').textContent=e.target.value+'%');
+$('playPromenade').addEventListener('click',async()=>{try{$('playerStatus').textContent='Preparando el reproductor...';await preparePlayer();if(!soundReady){$('playerStatus').textContent='Selecciona bassoon.sf2 y pulsa «Cargar sonido de fagot».';return}await audioContext.resume();playSelected();$('playerStatus').textContent='Reproduciendo '+(selectedVoice==='both'?'las dos partes':'la parte '+selectedVoice)+'.'}catch(e){$('playerStatus').textContent='Error: '+e.message;console.error(e)}});
+$('pausePromenade').addEventListener('click',()=>{stopPlayer();$('playerStatus').textContent='Reproducción detenida.'});
+$('stopPromenade').addEventListener('click',()=>{stopPlayer();$('playerStatus').textContent='Reproducción detenida.'});
 
 const {data:{session}}=await supabase.auth.getSession();if(session)go(session.user);
 </script></body></html>
